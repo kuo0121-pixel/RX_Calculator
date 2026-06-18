@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>柏宇的爬行大冒險 🍼</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    background: #f3ead7;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    color: #5a4a36;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+  #wrap {
+    position: relative;
+    width: 100%;
+    max-width: 880px;
+    aspect-ratio: 16 / 9;
+    max-height: 100vh;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 14px 40px rgba(120, 96, 60, 0.28);
+    background: #cfe9f0;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    background: rgba(243, 234, 215, 0.92);
+    backdrop-filter: blur(3px);
+    padding: 24px;
+    gap: 14px;
+  }
+  .overlay.hidden { display: none; }
+  .title {
+    font-size: clamp(26px, 5vw, 46px);
+    font-weight: 800;
+    color: #d98344;
+    text-shadow: 0 2px 0 #fff;
+    letter-spacing: 1px;
+  }
+  .subtitle { font-size: clamp(13px, 2.4vw, 17px); color: #8a7656; line-height: 1.7; max-width: 30em; }
+  .baby-emoji { font-size: clamp(46px, 9vw, 78px); animation: bob 1.4s ease-in-out infinite; }
+  @keyframes bob { 0%,100%{transform:translateY(0) rotate(-3deg);} 50%{transform:translateY(-10px) rotate(3deg);} }
+  .btn {
+    margin-top: 6px;
+    border: none;
+    background: linear-gradient(#ffb169, #f08a3c);
+    color: #fff;
+    font-size: clamp(16px, 3vw, 20px);
+    font-weight: 800;
+    padding: 14px 38px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #c96d28, 0 10px 18px rgba(201,109,40,0.4);
+    transition: transform .08s, box-shadow .08s;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #c96d28, 0 4px 10px rgba(201,109,40,0.4); }
+  .hint { font-size: clamp(12px, 2.2vw, 15px); color: #a8916c; }
+  .stat-row { display: flex; gap: 26px; margin: 4px 0; flex-wrap: wrap; justify-content: center; }
+  .stat { background: #fff7ea; border-radius: 14px; padding: 10px 18px; box-shadow: 0 3px 0 #e6d4b3; }
+  .stat .num { font-size: clamp(22px, 4vw, 34px); font-weight: 800; color: #d98344; }
+  .stat .lbl { font-size: 12px; color: #a8916c; margin-top: 2px; }
+  .badge-line { font-size: clamp(13px,2.6vw,18px); color:#6b8e4e; font-weight:700; min-height: 1.4em; }
+
+  /* HUD */
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; pointer-events: none;
+    font-weight: 800;
+  }
+  #hearts { font-size: clamp(18px, 3.4vw, 26px); letter-spacing: 2px; }
+  #score { font-size: clamp(16px, 3vw, 24px); color: #5a4a36; text-shadow: 0 1px 0 #fff; }
+  #toast {
+    position: absolute; top: 18%; left: 50%; transform: translateX(-50%);
+    background: rgba(255,255,255,0.9); color:#6b8e4e; font-weight:800;
+    padding: 8px 20px; border-radius: 999px; font-size: clamp(14px,2.8vw,19px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12); opacity: 0; transition: opacity .3s, transform .3s;
+    pointer-events: none; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+  #muteBtn {
+    position:absolute; bottom:10px; right:12px; pointer-events:auto;
+    background:rgba(255,255,255,0.75); border:none; border-radius:10px;
+    padding:6px 10px; font-size:16px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.1);
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="hearts">❤️❤️❤️</div>
+    <div id="score">0 公分</div>
+  </div>
+  <div id="toast"></div>
+  <button id="muteBtn" title="音效開關">🔊</button>
+
+  <!-- Start screen -->
+  <div id="start" class="overlay">
+    <div class="baby-emoji">👶</div>
+    <div class="title">柏宇的爬行大冒險</div>
+    <div class="subtitle">
+      8 個月大的柏宇在客廳裡開始爬行探險！<br>
+      收集 🍼 奶瓶、🦷 固齒器、🧸 玩具，<br>
+      閃避巡邏的 🤖 掃地機器人和散落的 🛋️ 抱枕。
+    </div>
+    <button class="btn" id="startBtn">開始爬行！</button>
+    <div class="hint">電腦：空白鍵 / ↑ 跳　　手機：點畫面跳</div>
+  </div>
+
+  <!-- Game over screen -->
+  <div id="over" class="overlay hidden">
+    <div class="baby-emoji" id="overFace">😴</div>
+    <div class="title" id="overTitle">柏宇累累要休息～</div>
+    <div class="stat-row">
+      <div class="stat"><div class="num" id="finalScore">0</div><div class="lbl">爬行距離 (公分)</div></div>
+      <div class="stat"><div class="num" id="bestScore">0</div><div class="lbl">最佳紀錄</div></div>
+    </div>
+    <div class="badge-line" id="badgeLine"></div>
+    <button class="btn" id="retryBtn">再爬一次！</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Canvas setup ----------
+  var canvas = document.getElementById("game");
+  var ctx = canvas.getContext("2d");
+  var W = 880, H = 495;            // internal logical resolution (16:9)
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+  function fitCanvas() {
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  fitCanvas();
+
+  // ---------- DOM ----------
+  var startScreen = document.getElementById("start");
+  var overScreen  = document.getElementById("over");
+  var hud         = document.getElementById("hud");
+  var heartsEl    = document.getElementById("hearts");
+  var scoreEl     = document.getElementById("score");
+  var toastEl     = document.getElementById("toast");
+  var finalScoreEl= document.getElementById("finalScore");
+  var bestScoreEl = document.getElementById("bestScore");
+  var badgeLineEl = document.getElementById("badgeLine");
+  var overTitleEl = document.getElementById("overTitle");
+  var overFaceEl  = document.getElementById("overFace");
+  var muteBtn     = document.getElementById("muteBtn");
+
+  // ---------- Audio (tiny WebAudio blips) ----------
+  var muted = false, audioCtx = null;
+  function ensureAudio() {
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+    }
+  }
+  function blip(freq, dur, type, vol) {
+    if (muted || !audioCtx) return;
+    var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = type || "sine"; o.frequency.value = freq;
+    g.gain.value = vol || 0.06;
+    o.connect(g); g.connect(audioCtx.destination);
+    var t = audioCtx.currentTime;
+    g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.start(t); o.stop(t + dur);
+  }
+  muteBtn.addEventListener("click", function () {
+    muted = !muted;
+    muteBtn.textContent = muted ? "🔇" : "🔊";
+  });
+
+  // ---------- Game constants ----------
+  var GROUND_Y = H - 86;           // baby's crawling baseline (feet line)
+  var GRAVITY  = 2200;             // px/s^2
+  var JUMP_V   = -760;             // initial jump velocity
+  var BASE_SPEED = 280;            // px/s world speed at start
+  var MAX_SPEED  = 620;
+
+  // Collectible & obstacle defs
+  var COLLECTIBLES = [
+    { emoji: "🍼", points: 10, name: "奶瓶" },
+    { emoji: "🦷", points: 15, name: "固齒器" },
+    { emoji: "🧸", points: 20, name: "玩具熊" },
+    { emoji: "🟦", points: 25, name: "DDIC 晶片" }  // tech easter-egg item
+  ];
+  var OBSTACLES = [
+    { emoji: "🤖", name: "掃地機器人", w: 56, h: 40 },
+    { emoji: "🛋️", name: "抱枕沙發", w: 64, h: 46 }
+  ];
+
+  // Encouraging milestone messages (cute & warm)
+  var MILESTONES = [
+    { d: 200,  msg: "柏宇爬得好快！👏" },
+    { d: 500,  msg: "扶站達人出現～🧍" },
+    { d: 1018, msg: "10/18 生日寶寶！🎂" },   // birthday easter egg 2025/10/18
+    { d: 1500, msg: "咿咿呀呀超開心！🗣️" },
+    { d: 2500, msg: "爸媽都看呆了 😍" },
+    { d: 4000, msg: "傳說中的爬行小冠軍 🏆" }
+  ];
+
+  // ---------- State ----------
+  var state = "start";  // start | playing | over
+  var baby, world, items, obstacles, particles;
+  var score, dist, hearts, speed, spawnTimer, itemTimer, invuln, milestoneIdx, best;
+
+  best = parseInt(localStorage.getItem("baiyu_best") || "0", 10) || 0;
+
+  function reset() {
+    baby = { x: 150, y: GROUND_Y, vy: 0, onGround: true, anim: 0, squash: 0 };
+    world = { scroll: 0 };
+    items = [];
+    obstacles = [];
+    particles = [];
+    score = 0; dist = 0; hearts = 3; speed = BASE_SPEED;
+    spawnTimer = 1.2; itemTimer = 0.7; invuln = 0; milestoneIdx = 0;
+    updateHUD();
+  }
+
+  function updateHUD() {
+    heartsEl.textContent = "❤️".repeat(hearts) + "🤍".repeat(Math.max(0, 3 - hearts));
+    scoreEl.textContent = Math.floor(dist) + " 公分";
+  }
+
+  // ---------- Input ----------
+  function jump() {
+    if (state !== "playing") return;
+    if (baby.onGround) {
+      baby.vy = JUMP_V;
+      baby.onGround = false;
+      baby.squash = 0.4;
+      blip(520, 0.12, "square", 0.05);
+    }
+  }
+  window.addEventListener("keydown", function (e) {
+    if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") {
+      e.preventDefault();
+      if (state === "start") startGame();
+      else if (state === "over") startGame();
+      else jump();
+    }
+  });
+  canvas.addEventListener("pointerdown", function () { ensureAudio(); jump(); });
+
+  document.getElementById("startBtn").addEventListener("click", function () { ensureAudio(); startGame(); });
+  document.getElementById("retryBtn").addEventListener("click", function () { ensureAudio(); startGame(); });
+
+  function startGame() {
+    reset();
+    state = "playing";
+    startScreen.classList.add("hidden");
+    overScreen.classList.add("hidden");
+    hud.classList.remove("hidden");
+    blip(660, 0.15, "triangle", 0.06);
+    lastT = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Toast ----------
+  var toastTimer = null;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 1400);
+  }
+
+  // ---------- Spawning ----------
+  function spawnObstacle() {
+    var o = OBSTACLES[(Math.random() * OBSTACLES.length) | 0];
+    obstacles.push({
+      x: W + 40, y: GROUND_Y, w: o.w, h: o.h, emoji: o.emoji, name: o.name, hit: false
+    });
+  }
+  function spawnItem() {
+    var c = COLLECTIBLES[weightedItem()];
+    // either low (crawl height) or high (needs a jump)
+    var high = Math.random() < 0.5;
+    var y = high ? GROUND_Y - 120 - Math.random() * 40 : GROUND_Y - 18;
+    items.push({ x: W + 30, y: y, r: 18, emoji: c.emoji, points: c.points, name: c.name, taken: false, bob: Math.random() * 6.28 });
+  }
+  function weightedItem() {
+    // rarer high-value items
+    var r = Math.random();
+    if (r < 0.45) return 0;   // bottle
+    if (r < 0.72) return 1;   // teether
+    if (r < 0.90) return 2;   // toy
+    return 3;                 // DDIC chip (rare)
+  }
+
+  // ---------- Particles ----------
+  function burst(x, y, color) {
+    for (var i = 0; i < 8; i++) {
+      var a = Math.random() * 6.28, sp = 60 + Math.random() * 120;
+      particles.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40, life: 0.5, color: color });
+    }
+  }
+
+  // ---------- Collision ----------
+  function babyBox() {
+    // crawling baby hitbox (a bit forgiving)
+    return { x: baby.x - 28, y: baby.y - 42, w: 66, h: 42 };
+  }
+  function overlap(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  // ---------- Update ----------
+  var lastT = 0;
+  function loop(now) {
+    if (state !== "playing") return;
+    var dt = Math.min((now - lastT) / 1000, 0.05);
+    lastT = now;
+    update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  function update(dt) {
+    // speed ramps up slowly
+    speed = Math.min(MAX_SPEED, speed + dt * 9);
+    var move = speed * dt;
+    world.scroll += move;
+    dist += move / 6;   // 6px ≈ 1 "公分"
+
+    // baby physics
+    baby.vy += GRAVITY * dt;
+    baby.y += baby.vy * dt;
+    if (baby.y >= GROUND_Y) { baby.y = GROUND_Y; baby.vy = 0; baby.onGround = true; }
+    baby.anim += dt * (baby.onGround ? 10 : 4);
+    if (baby.squash > 0) baby.squash = Math.max(0, baby.squash - dt * 2);
+    if (invuln > 0) invuln -= dt;
+
+    // spawn
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+      spawnObstacle();
+      spawnTimer = 1.1 + Math.random() * 1.0 - (speed - BASE_SPEED) / 1400;
+      if (spawnTimer < 0.7) spawnTimer = 0.7;
+    }
+    itemTimer -= dt;
+    if (itemTimer <= 0) {
+      spawnItem();
+      itemTimer = 0.6 + Math.random() * 0.9;
+    }
+
+    // move & cull obstacles
+    for (var i = obstacles.length - 1; i >= 0; i--) {
+      var o = obstacles[i];
+      o.x -= move;
+      if (o.x + o.w < -40) { obstacles.splice(i, 1); continue; }
+      if (!o.hit && invuln <= 0) {
+        var ob = { x: o.x - o.w / 2, y: o.y - o.h, w: o.w, h: o.h };
+        if (overlap(babyBox(), ob)) {
+          o.hit = true;
+          hearts--;
+          invuln = 1.1;
+          baby.vy = -380;            // small recoil hop
+          baby.onGround = false;
+          burst(baby.x, baby.y - 24, "#f08a3c");
+          blip(160, 0.25, "sawtooth", 0.07);
+          updateHUD();
+          showToast("哎呀！撞到" + o.name + "了 💦");
+          if (hearts <= 0) { gameOver(); return; }
+        }
+      }
+    }
+
+    // move & collect items
+    for (var j = items.length - 1; j >= 0; j--) {
+      var it = items[j];
+      it.x -= move;
+      it.bob += dt * 4;
+      if (it.x + it.r < -30) { items.splice(j, 1); continue; }
+      if (!it.taken) {
+        var bb = babyBox();
+        var cx = it.x, cy = it.y + Math.sin(it.bob) * 4;
+        // circle-rect-ish check
+        if (cx > bb.x - it.r && cx < bb.x + bb.w + it.r && cy > bb.y - it.r && cy < bb.y + bb.h + it.r) {
+          it.taken = true;
+          score += it.points;
+          dist += it.points * 0.4;  // collecting also nudges distance
+          burst(cx, cy, "#6b8e4e");
+          blip(820 + it.points * 6, 0.1, "sine", 0.06);
+          showToast("+" + it.points + " " + it.name + "！");
+          items.splice(j, 1);
+          updateHUD();
+        }
+      }
+    }
+
+    // milestones
+    if (milestoneIdx < MILESTONES.length && dist >= MILESTONES[milestoneIdx].d) {
+      showToast(MILESTONES[milestoneIdx].msg);
+      blip(990, 0.2, "triangle", 0.06);
+      milestoneIdx++;
+    }
+
+    // particles
+    for (var p = particles.length - 1; p >= 0; p--) {
+      var pt = particles[p];
+      pt.life -= dt;
+      pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.vy += 600 * dt;
+      if (pt.life <= 0) particles.splice(p, 1);
+    }
+
+    updateHUD();
+  }
+
+  function gameOver() {
+    state = "over";
+    hud.classList.add("hidden");
+    var total = Math.floor(dist);
+    finalScoreEl.textContent = total;
+    if (total > best) { best = total; localStorage.setItem("baiyu_best", String(best)); }
+    bestScoreEl.textContent = best;
+
+    // badge based on distance — playful "future achievement" tie-in
+    var badge;
+    if (total >= 4000)      badge = "🏆 傳說級爬行冠軍";
+    else if (total >= 2500) badge = "🚀 爬行火箭寶寶";
+    else if (total >= 1500) badge = "🌟 客廳探險家";
+    else if (total >= 800)  badge = "🦷 固齒器收藏家";
+    else if (total >= 300)  badge = "🍼 奶瓶獵人";
+    else                    badge = "🐣 新手爬行員";
+    badgeLineEl.textContent = "獲得徽章：" + badge;
+
+    overTitleEl.textContent = total > 1018 ? "柏宇今天超級棒！" : "柏宇累累要休息～";
+    overFaceEl.textContent = total > 1018 ? "🥳" : "😴";
+    overScreen.classList.remove("hidden");
+    blip(220, 0.4, "sine", 0.07);
+  }
+
+  // ---------- Render ----------
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    drawBackground();
+    drawGround();
+    // items behind/around baby
+    for (var i = 0; i < items.length; i++) drawItem(items[i]);
+    for (var o = 0; o < obstacles.length; o++) drawObstacle(obstacles[o]);
+    drawBaby();
+    drawParticles();
+  }
+
+  function drawBackground() {
+    // sky gradient (cozy living room wall)
+    var g = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+    g.addColorStop(0, "#dff1f6");
+    g.addColorStop(1, "#f6ead2");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GROUND_Y);
+
+    // soft sun / lamp glow
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    var sg = ctx.createRadialGradient(W * 0.8, 80, 10, W * 0.8, 80, 160);
+    sg.addColorStop(0, "#fff4cf"); sg.addColorStop(1, "rgba(255,244,207,0)");
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, 0, W, GROUND_Y);
+    ctx.restore();
+
+    // parallax "furniture" clouds/pillows in distance
+    var off = (world.scroll * 0.25) % 360;
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    for (var k = -1; k < W / 360 + 1; k++) {
+      var bx = k * 360 - off;
+      roundedBlob(bx + 60, 120, 120, 44);
+      roundedBlob(bx + 250, 90, 90, 34);
+    }
+  }
+  function roundedBlob(x, y, w, h) {
+    ctx.beginPath();
+    ctx.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawGround() {
+    // play mat
+    ctx.fillStyle = "#bfe3c0";
+    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+    // mat tiles scrolling
+    var tile = 70, off = world.scroll % tile;
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 3;
+    for (var x = -off; x < W; x += tile) {
+      ctx.beginPath(); ctx.moveTo(x, GROUND_Y); ctx.lineTo(x, H); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(0, GROUND_Y + 24); ctx.lineTo(W, GROUND_Y + 24); ctx.stroke();
+    // top edge
+    ctx.fillStyle = "#a7d4a9";
+    ctx.fillRect(0, GROUND_Y, W, 6);
+  }
+
+  function drawItem(it) {
+    var y = it.y + Math.sin(it.bob) * 4;
+    // glow
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = "#fff3c4";
+    ctx.beginPath(); ctx.arc(it.x, y, it.r + 8, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.font = (it.r * 2) + "px serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(it.emoji, it.x, y);
+  }
+
+  function drawObstacle(o) {
+    ctx.save();
+    if (o.hit) ctx.globalAlpha = 0.4;
+    // shadow
+    ctx.fillStyle = "rgba(90,74,54,0.18)";
+    ctx.beginPath(); ctx.ellipse(o.x, o.y + 2, o.w * 0.55, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.font = o.h + "px serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText(o.emoji, o.x, o.y + 6);
+    ctx.restore();
+  }
+
+  function drawParticles() {
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      ctx.globalAlpha = Math.max(0, p.life * 2);
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Cute baby (canvas vector) ----------
+  function drawBaby() {
+    var x = baby.x, y = baby.y;
+    var blink = (invuln > 0 && Math.floor(invuln * 12) % 2 === 0);
+    ctx.save();
+    if (blink) ctx.globalAlpha = 0.45;
+
+    // shadow
+    ctx.fillStyle = "rgba(90,74,54,0.18)";
+    var shScale = baby.onGround ? 1 : 0.7;
+    ctx.beginPath();
+    ctx.ellipse(x + 4, GROUND_Y + 4, 40 * shScale, 9 * shScale, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // crawling limb cycle
+    var swing = Math.sin(baby.anim) * 8;
+    var squash = 1 - baby.squash * 0.4;
+
+    ctx.translate(x, y);
+    ctx.scale(1, squash);
+
+    // legs (behind)
+    ctx.strokeStyle = "#f6c9a0"; ctx.lineWidth = 13; ctx.lineCap = "round";
+    leg(8, -6, 26, -2 - swing);
+    leg(2, -6, 22, -2 + swing);
+
+    // body (onesie)
+    ctx.fillStyle = "#8fd0e0";
+    roundRectPath(-30, -34, 56, 32, 16); ctx.fill();
+    // onesie spot
+    ctx.fillStyle = "#bfe6f0";
+    ctx.beginPath(); ctx.arc(-4, -18, 7, 0, Math.PI * 2); ctx.fill();
+
+    // arms (front)
+    ctx.strokeStyle = "#f6c9a0"; ctx.lineWidth = 12;
+    arm(-22, -22, -30, -2 + swing);
+    arm(-14, -22, -22, -2 - swing);
+
+    // head
+    ctx.fillStyle = "#fbd7b3";
+    ctx.beginPath(); ctx.arc(-34, -40, 22, 0, Math.PI * 2); ctx.fill();
+    // hair curl
+    ctx.strokeStyle = "#8a5a3a"; ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(-34, -58, 5, Math.PI * 0.1, Math.PI * 1.1); ctx.stroke();
+    // cheek
+    ctx.fillStyle = "rgba(244,138,138,0.45)";
+    ctx.beginPath(); ctx.arc(-46, -36, 5, 0, Math.PI * 2); ctx.fill();
+    // eye
+    ctx.fillStyle = "#4a3a2a";
+    if (blink) {
+      ctx.lineWidth = 2.5; ctx.strokeStyle = "#4a3a2a";
+      ctx.beginPath(); ctx.moveTo(-46, -42); ctx.lineTo(-40, -42); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.arc(-43, -43, 3.4, 0, Math.PI * 2); ctx.fill();
+    }
+    // smile
+    ctx.strokeStyle = "#c9786a"; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(-44, -34, 5, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+
+    ctx.restore();
+
+    function leg(ox, oy, len, ang) {
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.lineTo(ox + Math.cos((ang * Math.PI) / 18 + 0.4) * len, oy + Math.abs(Math.sin((ang * Math.PI) / 18)) * 4 + len * 0.5);
+      ctx.stroke();
+    }
+    function arm(ox, oy, ex, ang) {
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.lineTo(ex, oy + 16 + ang);
+      ctx.stroke();
+    }
+  }
+
+  function roundRectPath(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ---------- Idle splash render on start ----------
+  function idleRender() {
+    if (state === "start") {
+      reset(); render(); reset();
+    }
+  }
+  bestScoreEl.textContent = best;
+  idleRender();
+
+  window.addEventListener("resize", fitCanvas);
+})();
+</script>
+</body>
+</html>
